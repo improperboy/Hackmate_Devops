@@ -1,0 +1,132 @@
+
+services:
+
+  db:
+    image: postgres:16-alpine
+    container_name: hackmate-db
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-hackmate_db}
+      POSTGRES_USER: ${POSTGRES_USER:-hackmate}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hackmate_pass}
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-hackmate} -d ${POSTGRES_DB:-hackmate_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: hackmate-pgadmin
+    restart: always
+    ports:
+      - "8080:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@hackmate.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db-migrations:
+    build: ./db-migrations
+    container_name: hackmate-migrations
+    env_file: .env
+    restart: "no"
+
+  api-gateway:
+    build: ./api-gateway
+    container_name: hackmate-api-gateway
+    restart: always
+    ports:
+      - "8000:8000"
+    env_file: .env
+    depends_on:
+      db-migrations:
+        condition: service_completed_successfully
+      auth-service:
+        condition: service_started
+      user-service:
+        condition: service_started
+      team-service:
+        condition: service_started
+      scoring-service:
+        condition: service_started
+      submission-service:
+        condition: service_started
+      admin-service:
+        condition: service_started
+
+  auth-service:
+    build: ./auth-service
+    container_name: hackmate-auth
+    restart: always
+    ports:
+      - "8001:8001"
+    env_file: .env
+    depends_on:
+      db-migrations:
+        condition: service_completed_successfully
+
+  user-service:
+    build: ./user-service
+    container_name: hackmate-user
+    restart: always
+    ports:
+      - "8002:8002"
+    env_file: .env
+    depends_on:
+      db-migrations:
+        condition: service_completed_successfully
+
+  team-service:
+    build: ./team-service
+    container_name: hackmate-team
+    restart: always
+    ports:
+      - "8003:8003"
+    env_file: .env
+    depends_on:
+      db-migrations:
+        condition: service_completed_successfully
+
+  scoring-service:
+    build: ./scoring-service
+    container_name: hackmate-scoring
+    restart: always
+    ports:
+      - "8004:8004"
+    env_file: .env
+    depends_on:
+      db-migrations:
+        condition: service_completed_successfully
+
+  submission-service:
+    build: ./submission-service
+    container_name: hackmate-submission
+    restart: always
+    ports:
+      - "8005:8005"
+    env_file: .env
+    depends_on:
+      db-migrations:
+        condition: service_completed_successfully
+
+  admin-service:
+    build: ./admin-service
+    container_name: hackmate-admin
+    restart: always
+    ports:
+      - "8008:8008"
+    env_file: .env
+    depends_on:
+      db-migrations:
+        condition: service_completed_successfully
+
+volumes:
+  db_data:
