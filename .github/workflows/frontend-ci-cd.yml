@@ -1,0 +1,108 @@
+name: Frontend CI/CD
+
+on:
+  push:
+    branches: [main, hackmate-frontend]
+    paths:
+      - "hackmate-frontend/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - "hackmate-frontend/**"
+
+defaults:
+  run:
+    working-directory: hackmate-frontend
+
+jobs:
+  # ── CI: lint, type-check, test, build ──────────────────────────────────────
+  ci:
+    name: CI
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: hackmate-frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Test
+        run: npm run test
+
+      - name: Build
+        run: npm run build
+        env:
+          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL || 'http://localhost:8000' }}
+          VITE_WS_URL: ${{ secrets.VITE_WS_URL || 'ws://localhost:8000' }}
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: hackmate-frontend/dist/
+          retention-days: 7
+
+  # ── CD: runs only on push to main ──────────────────────────────────────────
+  cd:
+    name: CD
+    runs-on: ubuntu-latest
+    needs: ci
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: hackmate-frontend/dist/
+
+      # ── Placeholder: add your deploy step here ──────────────────────────────
+      # Examples (uncomment the one you use):
+      #
+      # Vercel:
+      #   uses: amondnet/vercel-action@v25
+      #   with:
+      #     vercel-token: ${{ secrets.VERCEL_TOKEN }}
+      #     vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+      #     vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+      #     working-directory: hackmate-frontend
+      #
+      # Netlify:
+      #   uses: nwtgck/actions-netlify@v3
+      #   with:
+      #     publish-dir: hackmate-frontend/dist
+      #     production-branch: main
+      #     github-token: ${{ secrets.GITHUB_TOKEN }}
+      #     deploy-message: "Deploy from GitHub Actions"
+      #   env:
+      #     NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+      #     NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+      #
+      # AWS S3 + CloudFront:
+      #   run: |
+      #     aws s3 sync hackmate-frontend/dist/ s3://${{ secrets.S3_BUCKET }} --delete
+      #     aws cloudfront create-invalidation --distribution-id ${{ secrets.CF_DISTRIBUTION_ID }} --paths "/*"
+      #   env:
+      #     AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      #     AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      #     AWS_DEFAULT_REGION: ap-south-1
+
+      - name: Deploy (not configured yet)
+        run: echo "✅ Build artifact ready. Add your deploy target in the CD job."
